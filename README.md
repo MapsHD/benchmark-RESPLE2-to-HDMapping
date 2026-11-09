@@ -124,8 +124,8 @@ The benchmark records:
 | `/odometry` | `nav_msgs/Odometry` | the `body` pose in the `world` frame |
 | `/scan_world` | `sensor_msgs/PointCloud2` | the points of each estimator update in the `world` frame |
 
-The RViz view is RESPLE2's own `config.rviz` with the displays that get no data
-in LiDAR-inertial mode switched off, see
+The RViz view is based on RESPLE2's own `config.rviz`, keeping the displays that
+get data in LiDAR-inertial mode and adding the Time panel, see
 [overlay/rviz/resple2_bench.rviz](overlay/rviz/resple2_bench.rviz).
 
 **Timestamps:** the benchmark does not change RESPLE2's clock (no
