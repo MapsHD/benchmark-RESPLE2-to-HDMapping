@@ -1,140 +1,63 @@
-## Hint
+# RESPLE2 to HDMapping simplified instruction
 
-Please change branch to [Bunker-DVI-Dataset-reg-1](https://github.com/MapsHD/benchmark-RESPLE2-to-HDMapping/tree/Bunker-DVI-Dataset-reg-1) for quick experiment.
+## Step 1 (prepare data)
+Download the dataset `reg-1.bag` by clicking [link](https://cloud.cylab.be/public.php/dav/files/7PgyjbM2CBcakN5/reg-1.bag) or from the [Zenodo](https://zenodo.org/records/23069933) mirror (it is part of [Bunker DVI Dataset](https://charleshamesse.github.io/bunker-dvi-dataset)).
 
-## Example Dataset:
-
-Download the dataset from [Bunker DVI Dataset](https://charleshamesse.github.io/bunker-dvi-dataset/)
-
-# benchmark-RESPLE2-to-HDMapping
-
-Runs [RESPLE2](https://github.com/ASIG-X/RESPLE2) in its LiDAR-inertial mode on
-a rosbag and converts the output to an
-[HDMapping](https://github.com/MapsHD/HDMapping) session.
-
-RESPLE2 (Z. Cao et al., "RESPLE2: Inertial-Informed Recursive Non-Uniform Spline
-Estimation for Multi-Sensor Odometry with Global Refinement") estimates a
-non-uniform B-spline trajectory recursively. It also supports camera and leg
-kinematics; the benchmark uses LiDAR and IMU only.
-
-## Prerequisites
-
-- Docker
-- A ROS 2 bag directory, or a ROS 1 bag file (its LiDAR and IMU topics are
-  converted to ROS 2 automatically), with a LiDAR topic and a
-  `sensor_msgs/Imu` topic. The LiDAR message depends on `lidar_type`:
-
-| `lidar_type` | LiDAR message |
-|--------------|---------------|
-| `HAP360` | `livox_ros_driver2/msg/CustomMsg` |
-| `Mid70Avia` | `livox_ros_driver/msg/CustomMsg` |
-| `AviaResple` | `livox_interfaces/msg/CustomMsg` |
-| `Ouster`, `Hesai`, `Mid360Boxi`, `Odin` | `sensor_msgs/msg/PointCloud2` |
-
-## Step 1 — Clone with submodules
+On Zenodo the bag archive is split into `reg-1.zip.part-000`, `reg-1.zip.part-001`, etc.,
+download all parts, then merge and extract them:
 
 ```bash
-git clone https://github.com/MapsHD/benchmark-RESPLE2-to-HDMapping.git --recursive
-cd benchmark-RESPLE2-to-HDMapping
+cd ~/Downloads
+cat reg-1.zip.part-0* > full.zip
+zip -F full.zip --out full-fixed.zip
+unzip full-fixed.zip
 ```
 
-## Step 2 — Build the Docker image
+File `reg-1.bag` is an input for further calculations.
+It should be located in `~/hdmapping-benchmark/data`.
 
-```bash
+## Step 2 (prepare docker)
+```shell
+mkdir -p ~/hdmapping-benchmark
+cd ~/hdmapping-benchmark
+git clone https://github.com/MapsHD/benchmark-RESPLE2-to-HDMapping.git --recursive
+cd benchmark-RESPLE2-to-HDMapping
+git checkout Bunker-DVI-Dataset-reg-1
 docker build -t resple2_humble .
 ```
 
-This installs:
-- Ubuntu 22.04 + ROS 2 Humble, PCL, OpenCV, Ceres, SuiteSparse
-- Pinocchio 3.9.0, built from source (RESPLE2's build requires it)
-- colcon workspace with `resple2`, its message packages and `resple2_to_hdmapping`
-
-## Step 3 — Run the pipeline
-
-```bash
+## Step 3 (run docker, file `reg-1.bag` should be in `~/hdmapping-benchmark/data`)
+```shell
+cd ~/hdmapping-benchmark/benchmark-RESPLE2-to-HDMapping
 chmod +x docker_session_run-ros2-resple2.sh
-./docker_session_run-ros2-resple2.sh /path/to/input /path/to/output/dir
+cd ~/hdmapping-benchmark/data
+~/hdmapping-benchmark/benchmark-RESPLE2-to-HDMapping/docker_session_run-ros2-resple2.sh reg-1.bag .
 ```
 
-The input is a ROS 2 bag directory or a ROS 1 `.bag` file. With no arguments, a
-GUI file selector is used (requires `zenity`).
+The script first converts the LiDAR and IMU topics of `reg-1.bag` to ROS 2.
+While the bag plays you can watch RESPLE2 build the map live in RViz:
 
-| Variable | Default | Meaning |
-|----------|---------|---------|
-| `CONFIG_FILE` | `config_hopper_int.yaml` | RESPLE2 parameter file: a file on the host, or the name of one in RESPLE2's [config/](https://github.com/ASIG-X/RESPLE2/tree/main/resple2/config) folder |
-| `ODOM_TOPIC` | `/odometry` | Recorded odometry topic |
-| `CLOUD_TOPIC` | `/scan_world` | Recorded scan topic |
-| `USE_RVIZ` | `1` | RViz live view |
-| `PLAY_RATE` | `1.0` | `ros2 bag play` rate |
+![RESPLE2 running in RViz](images/RVIZ.png)
 
-To use your own sensor, copy a parameter file, set its topics, `lidar_type`,
-`acc_ratio` (`true` if the accelerometer is in g) and extrinsics, keep
-`if_visual` and `if_kin` at `false`, and pass it:
+## Step 4 (Open and visualize data)
+Expected data should appear in `~/hdmapping-benchmark/data/output_hdmapping-resple2`.
+Use tool [multi_view_tls_registration_step_2](https://github.com/MapsHD/HDMapping) to open `session.json` from `~/hdmapping-benchmark/data/output_hdmapping-resple2`.
 
-```bash
-CONFIG_FILE=/path/to/my_sensor.yaml \
-  ./docker_session_run-ros2-resple2.sh /path/to/input /path/to/output/dir
-```
+![RESPLE2 session opened in HDMapping multi_view_tls_registration_step_2, top view](images/STEP_2_1.png)
 
-Before anything starts, the script checks that the parameter file's topics are
-in the bag with a type RESPLE2 reads for that `lidar_type`, and that the camera
-and leg kinematics modes are off.
+![RESPLE2 session opened in HDMapping multi_view_tls_registration_step_2, side view](images/STEP2_2.png)
 
-**What happens:**
+You should see the following data in folder `~/hdmapping-benchmark/data/output_hdmapping-resple2`:
 
-The script opens a Docker container with a tmux session containing five panes on
-window 0 and a `control` window (window 1, the attach target):
-
-| Pane | Role |
-|------|------|
-| 0 | `ros2 launch resple2 resple2_bench.launch.py` — the RESPLE2 and Mapping nodes |
-| 1 | `ros2 bag record /odometry /scan_world` |
-| 2 | `ros2 bag play` — plays the LiDAR and IMU topics of your bag |
-| 3 | RViz live view |
-| 4 | diagnostics — shows active topics and publishing rates |
-
-When playback finishes, the control window stops the recorder, kills all nodes
-and RViz, and exits tmux. A second Docker run then converts the recorded bag
-into the HDMapping session format.
-
-## Step 4 — Open in HDMapping
-
-Output files appear in `<output_dir>/output_hdmapping-resple2/`:
-
-```
 lio_initial_poses.reg
+
 poses.reg
-scan_lio_0.laz
-...
+
+scan_lio_*.laz
+
 session.json
-trajectory_lio_0.csv
-...
-```
 
-Open `session.json` with the
-[multi_view_tls_registration_step_2](https://github.com/MapsHD/HDMapping)
-application.
+trajectory_lio_*.csv
 
-## Notes on RESPLE2
-
-The benchmark records:
-
-| Topic | Type | Meaning |
-|-------|------|---------|
-| `/odometry` | `nav_msgs/Odometry` | the `body` pose in the `world` frame |
-| `/scan_world` | `sensor_msgs/PointCloud2` | the points of each estimator update in the `world` frame |
-
-The RViz view is based on RESPLE2's own `config.rviz`, keeping the displays that
-get data in LiDAR-inertial mode and adding the Time panel, see
-[overlay/rviz/resple2_bench.rviz](overlay/rviz/resple2_bench.rviz).
-
-**Timestamps:** the benchmark does not change RESPLE2's clock (no
-`use_sim_time`). `/odometry` is stamped with times taken from the input
-messages, i.e. bag time. RESPLE2 publishes `/scan_world` without a timestamp, so
-the converter gives each cloud the stamp of the `/odometry` message received
-closest to it. That time only groups the clouds and poses into the session's
-chunks; the points are already in the `world` frame.
-
-## Contact
-
+## Contact email
 januszbedkowski@gmail.com
