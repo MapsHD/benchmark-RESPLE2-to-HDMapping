@@ -1,0 +1,6 @@
+[submodule "src/RESPLE2"]
+	path = src/RESPLE2
+	url = https://github.com/ASIG-X/RESPLE2.git
+[submodule "src/resple2-to-hdmapping/src/3rdparty/LASzip"]
+	path = src/resple2-to-hdmapping/src/3rdparty/LASzip
+	url = https://github.com/LASzip/LASzip.git
